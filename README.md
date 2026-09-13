@@ -1,39 +1,44 @@
-# API de Artículos — TP Evaluativo PP1 Python
+# API de Artículos — TP4 PP1 Python (Integración con SQLAlchemy)
 
-Proyecto desarrollado con **FastAPI** para el TP Evaluativo de PP1 - Python (ITEC Río Cuarto).
+Proyecto desarrollado con **FastAPI** y **SQLAlchemy** para el TP4 de PP1 - Python (ITEC Río Cuarto).
+
+Parte del TP Evaluativo anterior, que usaba un CRUD en memoria, y ahora persiste los datos
+en una base de datos real (**SQLite**) usando SQLAlchemy como ORM.
 
 ## Estructura del proyecto
 
-```
 proyecto_fastapi/
 ├── requirements.txt
+├── .gitignore
 └── src/
-    ├── main.py              # Punto de entrada
-    ├── schemas/
-    │   └── articulos.py     # Modelos de Pydantic (ArticuloEdit, ArticuloResponse)
-    └── routers/
-        └── articulos.py     # Path operations (CRUD)
-```
+├── main.py # Punto de entrada, crea las tablas al arrancar
+├── database.py # Configuración de SQLAlchemy: engine, SessionLocal, get_db
+├── models/
+│ └── articulo.py # Modelo ORM (tabla "articulos")
+├── schemas/
+│ └── articulos.py # Modelos de Pydantic (ArticuloEdit, ArticuloResponse)
+└── routers/
+└── articulos.py # Path operations (CRUD) sobre la base de datos real
 
 ## Instalación
 
 1. Crear y activar un entorno virtual:
 
-   ```bash
+```bash
    python -m venv venv
    # Windows:
    venv\Scripts\activate
    # Linux / Mac:
    source venv/bin/activate
-   ```
+```
 
 2. Instalar las dependencias:
 
-   ```bash
+```bash
    pip install -r requirements.txt
-   ```
+```
 
-   (Esto instala `fastapi[standard]`, que incluye `uvicorn` y demás extras.)
+   (Esto instala `fastapi[standard]`, `SQLAlchemy` y demás dependencias.)
 
 ## Ejecución
 
@@ -49,6 +54,9 @@ o alternativamente:
 uvicorn src.main:app --reload
 ```
 
+Al arrancar por primera vez se crea automáticamente el archivo `articulos.db` (SQLite)
+en la raíz del proyecto, junto con la tabla `articulos`.
+
 ## Documentación interactiva
 
 Una vez levantado el servidor, abrir en el navegador:
@@ -58,19 +66,24 @@ Una vez levantado el servidor, abrir en el navegador:
 
 ## Endpoints disponibles
 
-| Método | Ruta                    | Descripción                              |
-|--------|--------------------------|-------------------------------------------|
-| POST   | `/articulos/`            | Crear un nuevo artículo                  |
-| GET    | `/articulos/`             | Listar artículos (filtros: `categoria`, `limite`) |
-| GET    | `/articulos/{articulo_id}` | Obtener un artículo por id (404 si no existe) |
-| PUT    | `/articulos/{articulo_id}` | Actualizar un artículo (404 si no existe) |
-| DELETE | `/articulos/{articulo_id}` | Eliminar un artículo (404 si no existe) |
+| Método | Ruta                        | Descripción                                        |
+|--------|------------------------------|-----------------------------------------------------|
+| POST   | `/articulos/`                | Crear un nuevo artículo (persiste en SQLite)        |
+| GET    | `/articulos/`                | Listar artículos (filtros: `categoria`, `limite`)   |
+| GET    | `/articulos/{articulo_id}`   | Obtener un artículo por id (404 si no existe)       |
+| PUT    | `/articulos/{articulo_id}`   | Actualizar un artículo (404 si no existe)           |
+| DELETE | `/articulos/{articulo_id}`   | Eliminar un artículo (404 si no existe)             |
 
-## Notas sobre el cumplimiento de la consigna
+## Notas sobre el cumplimiento de la consigna (TP4)
 
-- **CORS**: configurado en `main.py` para permitir la conexión con el front del TP01 de PP1 - JavaScript (orígenes de `localhost` típicos de Vite/Live Server).
-- **Modelos Pydantic**: `ArticuloEdit` (sin `id`, usado para crear/editar) y `ArticuloResponse` (con `id`, usado como `response_model`). Todos los campos usan `Annotated` + `Field()` con metadatos.
-- **"Tabla" simulada**: lista `db_articulos` en `routers/articulos.py`, validada con `ArticuloResponse` (id + 3 campos: `nombre`, `precio`, `categoria`).
-- **5 Path operations** en `routers/articulos.py`: 1 create, 2 read (listado + por id), 1 update, 1 delete.
-- **Parámetros tipados**: `Path()` para `articulo_id`, `Query()` para los filtros del listado.
-- **Errores 404**: se documentan en `/docs` mediante el parámetro `responses` de cada path operation y se levantan con `HTTPException`.
+- **SQLAlchemy en requirements**: `SQLAlchemy==2.0.36` en `requirements.txt`.
+- **`database.py`**: define `engine` (SQLite, `check_same_thread=False`), `SessionLocal`
+  (sessionmaker) y `get_db()` como dependencia inyectable con `Depends()`.
+- **Modelo**: `Articulo` en `src/models/articulo.py`, mapeado a la tabla `articulos`
+  (`id`, `nombre`, `precio`, `categoria`).
+- **CRUD real**: los 5 path operations en `routers/articulos.py` ya no usan una lista en
+  memoria — cada uno abre una `Session` vía `Depends(get_db)` y hace `db.add()`,
+  `db.query()`, `db.get()`, `db.commit()`, `db.delete()`, según corresponda.
+- **Schemas Pydantic**: `ArticuloResponse` usa `model_config = ConfigDict(from_attributes=True)`
+  para poder construirse directamente desde un objeto SQLAlchemy.
+- **Errores 404**: se levantan con `HTTPException` cuando el `articulo_id` no existe en la DB.
