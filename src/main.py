@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from src.database import Base, engine
-from src.models import articulo  # noqa: F401 -> necesario para registrar la tabla
+from src.models import articulo  
 from src.routers import articulos
 
-# Crea las tablas en la base de datos (si no existen) al arrancar la app
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -14,8 +12,6 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# Configuración de CORS para permitir la conexión con el front
-# desarrollado en el TP01 Evaluativo de PP1 - JavaScript.
 origins = [
     "http://localhost",
     "http://localhost:3000",
@@ -31,7 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inclusión de routers existentes
 app.include_router(articulos.router)
 
 

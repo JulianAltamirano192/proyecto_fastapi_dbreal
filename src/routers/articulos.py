@@ -1,7 +1,6 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
-
 from src.database import get_db
 from src.models.articulo import Articulo
 from src.schemas.articulos import ArticuloEdit, ArticuloResponse
@@ -13,7 +12,7 @@ router = APIRouter(
 
 
 def _buscar_articulo(articulo_id: int, db: Session) -> Articulo:
-    """Función auxiliar que busca un artículo por id en la DB o levanta un 404."""
+    # Busca un artículo por ID en la base de datos o retorna 404.
     articulo = db.get(Articulo, articulo_id)
     if articulo is None:
         raise HTTPException(
@@ -23,7 +22,6 @@ def _buscar_articulo(articulo_id: int, db: Session) -> Articulo:
     return articulo
 
 
-# ---------- 1) CREATE ----------
 @router.post(
     "/",
     response_model=ArticuloResponse,
@@ -38,7 +36,6 @@ def crear_articulo(articulo: ArticuloEdit, db: Session = Depends(get_db)) -> Art
     return nuevo_articulo
 
 
-# ---------- 2) READ (listado con filtros opcionales) ----------
 @router.get(
     "/",
     response_model=list[ArticuloResponse],
@@ -69,7 +66,6 @@ def listar_articulos(
     return query.limit(limite).all()
 
 
-# ---------- 3) READ (por id) ----------
 @router.get(
     "/{articulo_id}",
     response_model=ArticuloResponse,
@@ -86,7 +82,6 @@ def obtener_articulo(
     return _buscar_articulo(articulo_id, db)
 
 
-# ---------- 4) UPDATE ----------
 @router.put(
     "/{articulo_id}",
     response_model=ArticuloResponse,
@@ -110,7 +105,6 @@ def actualizar_articulo(
     return articulo_existente
 
 
-# ---------- 5) DELETE ----------
 @router.delete(
     "/{articulo_id}",
     response_model=ArticuloResponse,
