@@ -1,21 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlmodel import Session, create_engine
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./articulos.db"
+DATABASE_URL = "sqlite:///./articulos.db"
 
-# check_same_thread=False es necesario porque FastAPI es asíncrono
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+# check_same_thread=False es necesario porque FastAPI atiende requests desde varios threads
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def get_session():
+    """Dependencia inyectable: abre una Session por request y la cierra al terminar."""
+    with Session(engine) as session:
+        yield session

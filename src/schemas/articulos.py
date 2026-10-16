@@ -1,53 +1,34 @@
-from typing import Annotated
-from pydantic import BaseModel, ConfigDict, Field
+from sqlmodel import Field, SQLModel
 
 
-class ArticuloEdit(BaseModel):
+class ArticuloEdit(SQLModel):
     """
-    Schema usado para las vistas de edición (create / update).
-    No incluye 'id' porque ese valor lo genera/administra el servidor.
+    Schema para crear / actualizar artículos.
+    No incluye 'id' (lo genera la DB). La categoría se referencia por 'categoria_id' (FK).
     """
-    nombre: Annotated[
-        str,
-        Field(
-            min_length=2,
-            max_length=50,
-            description="Nombre del artículo",
-            examples=["Teclado mecánico"],
-        ),
-    ]
-    precio: Annotated[
-        float,
-        Field(
-            gt=0,
-            description="Precio del artículo en pesos. Debe ser mayor a 0.",
-            examples=[15999.99],
-        ),
-    ]
-    categoria: Annotated[
-        str,
-        Field(
-            min_length=2,
-            max_length=30,
-            description="Categoría a la que pertenece el artículo",
-            examples=["Periféricos"],
-        ),
-    ]
+
+    nombre: str = Field(
+        min_length=2,
+        max_length=50,
+        description="Nombre del artículo",
+        schema_extra={"examples": ["Teclado mecánico"]},
+    )
+    precio: float = Field(
+        gt=0,
+        description="Precio del artículo en pesos. Debe ser mayor a 0.",
+        schema_extra={"examples": [15999.99]},
+    )
+    categoria_id: int = Field(
+        gt=0,
+        description="Id de la categoría a la que pertenece el artículo",
+        schema_extra={"examples": [1]},
+    )
 
 
-class ArticuloResponse(ArticuloEdit):
-    """
-    Schema usado para las respuestas generales.
-    Hereda los campos de ArticuloEdit y agrega el 'id'.
-    model_config con from_attributes=True permite construir este schema
-    directamente desde un objeto SQLAlchemy (la clase Articulo del ORM).
-    """
-    model_config = ConfigDict(from_attributes=True)
+class ArticuloResumen(SQLModel):
+    """Artículo 'plano' (sin categoría). Se usa anidado dentro de CategoriaConArticulos."""
 
-    id: Annotated[
-        int,
-        Field(
-            description="Identificador único del artículo",
-            examples=[1],
-        ),
-    ]
+    id: int = Field(description="Identificador único del artículo", schema_extra={"examples": [1]})
+    nombre: str
+    precio: float
+    categoria_id: int

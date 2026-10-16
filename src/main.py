@@ -1,15 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.database import Base, engine
-from src.models import articulo  
-from src.routers import articulos
+from src.routers import articulos, categorias
 
-Base.metadata.create_all(bind=engine)
+# Las tablas ya NO se crean acá: de eso se encarga Alembic (ver README -> `alembic upgrade head`).
 
 app = FastAPI(
     title="API de Artículos - TP Evaluativo PP1 Python",
     description="API desarrollada con FastAPI para el TP Evaluativo de PP1 - Python (ITEC Río Cuarto).",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 origins = [
@@ -27,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(categorias.router)
 app.include_router(articulos.router)
 
 
