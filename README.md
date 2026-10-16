@@ -1,48 +1,92 @@
-# API de Artículos — TP4 PP1 Python (Integración con SQLAlchemy)
+# API de Artículos — TP5 PP1 Python (SQLModel + Alembic)
 
-Proyecto desarrollado con **FastAPI** y **SQLAlchemy** para el TP4 de PP1 - Python (ITEC Río Cuarto).
+Proyecto desarrollado con **FastAPI**, **SQLModel** y **Alembic** para el TP5 de PP1 - Python (ITEC Río Cuarto).
 
-Parte del TP Evaluativo anterior, que usaba un CRUD en memoria, y ahora persiste los datos
-en una base de datos real (**SQLite**) usando SQLAlchemy como ORM.
+Parte del TP4 (FastAPI + SQLAlchemy) y lo actualiza con:
+
+- **SQLModel** en lugar de SQLAlchemy (modelos, sesiones y consultas).
+- **Alembic** para versionar el esquema de la base de datos (migraciones).
+- **2 modelos relacionados** por Foreign Key: `Categoria` (1) → (N) `Articulo`.
+- **Schemas anidados**: el artículo devuelve su categoría embebida y la categoría devuelve sus artículos.
 
 ## Estructura del proyecto
 
+```
 proyecto_fastapi/
+├── alembic.ini                  # Configuración de Alembic
 ├── requirements.txt
 ├── .gitignore
+├── migrations/
+│   ├── env.py                   # Conecta Alembic con el engine y los modelos de SQLModel
+│   ├── script.py.mako           # Plantilla de migraciones (importa sqlmodel)
+│   └── versions/
+│       └── ..._migracion_inicial_categorias_y_articulos.py   # Migración inicial
 └── src/
-├── main.py # Punto de entrada, crea las tablas al arrancar
-├── database.py # Configuración de SQLAlchemy: engine, SessionLocal, get_db
-├── models/
-│ └── articulo.py # Modelo ORM (tabla "articulos")
-├── schemas/
-│ └── articulos.py # Modelos de Pydantic (ArticuloEdit, ArticuloResponse)
-└── routers/
-└── articulos.py # Path operations (CRUD) sobre la base de datos real
+    ├── main.py                  # Punto de entrada (ya NO crea tablas: eso lo hace Alembic)
+    ├── database.py              # engine de SQLModel + dependencia get_session
+    ├── models/                  # Tablas (SQLModel con table=True)
+    │   ├── categoria.py         #   Categoria  -> tabla "categorias"
+    │   └── articulo.py          #   Articulo   -> tabla "articulos" (FK categoria_id)
+    ├── schemas/                 # Schemas de entrada/salida (SQLModel sin table=True)
+    │   ├── categorias.py        #   CategoriaEdit, CategoriaResponse
+    │   ├── articulos.py         #   ArticuloEdit, ArticuloResumen
+    │   └── anidados.py          #   ArticuloConCategoria, CategoriaConArticulos
+    └── routers/
+        ├── categorias.py        # CRUD de categorías
+        └── articulos.py         # CRUD de artículos
+```
 
 ## Instalación
 
 1. Crear y activar un entorno virtual:
 
 ```bash
-   python -m venv venv
-   # Windows:
-   venv\Scripts\activate
-   # Linux / Mac:
-   source venv/bin/activate
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Linux / Mac:
+source venv/bin/activate
 ```
 
 2. Instalar las dependencias:
 
 ```bash
-   pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-   (Esto instala `fastapi[standard]`, `SQLAlchemy` y demás dependencias.)
+## Base de datos y migraciones (Alembic)
+
+Las tablas **no se crean al arrancar la app**. Antes de levantar el servidor por primera vez
+hay que aplicar las migraciones (desde la raíz del proyecto):
+
+```bash
+alembic upgrade head
+```
+
+Esto crea el archivo `articulos.db` (SQLite) con las tablas `categorias`, `articulos` y `alembic_version`.
+
+> Si venís del TP4 y tenés un `articulos.db` viejo (con la columna `categoria` como texto),
+> borralo antes de correr `alembic upgrade head`: el esquema cambió.
+
+Comandos útiles:
+
+| Comando | Para qué sirve |
+|---|---|
+| `alembic upgrade head` | Aplica todas las migraciones pendientes |
+| `alembic downgrade -1` | Revierte la última migración |
+| `alembic downgrade base` | Revierte todas (deja la DB sin tablas) |
+| `alembic current` | Muestra la versión actual de la DB |
+| `alembic history` | Lista las migraciones |
+| `alembic revision --autogenerate -m "mensaje"` | Genera una nueva migración comparando los modelos con la DB |
+| `alembic check` | Verifica que los modelos y la DB estén sincronizados |
+
+**Flujo para cambiar el esquema:** modificar el modelo en `src/models/` → `alembic revision --autogenerate -m "..."`
+→ revisar el archivo generado en `migrations/versions/` → `alembic upgrade head`.
+
+> Si se agrega un modelo nuevo, hay que importarlo en `src/models/__init__.py`
+> para que Alembic lo detecte.
 
 ## Ejecución
-
-Desde la **raíz del proyecto** (donde está `requirements.txt`, al mismo nivel que `src/`):
 
 ```bash
 fastapi dev src/main.py
@@ -54,36 +98,86 @@ o alternativamente:
 uvicorn src.main:app --reload
 ```
 
-Al arrancar por primera vez se crea automáticamente el archivo `articulos.db` (SQLite)
-en la raíz del proyecto, junto con la tabla `articulos`.
-
 ## Documentación interactiva
-
-Una vez levantado el servidor, abrir en el navegador:
 
 - Swagger UI: http://127.0.0.1:8000/docs
 - Redoc: http://127.0.0.1:8000/redoc
 
 ## Endpoints disponibles
 
-| Método | Ruta                        | Descripción                                        |
-|--------|------------------------------|-----------------------------------------------------|
-| POST   | `/articulos/`                | Crear un nuevo artículo (persiste en SQLite)        |
-| GET    | `/articulos/`                | Listar artículos (filtros: `categoria`, `limite`)   |
-| GET    | `/articulos/{articulo_id}`   | Obtener un artículo por id (404 si no existe)       |
-| PUT    | `/articulos/{articulo_id}`   | Actualizar un artículo (404 si no existe)           |
-| DELETE | `/articulos/{articulo_id}`   | Eliminar un artículo (404 si no existe)             |
+### Categorías (`/categorias`)
 
-## Notas sobre el cumplimiento de la consigna (TP4)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | `/categorias/` | Crear una categoría (409 si el nombre ya existe) |
+| GET    | `/categorias/` | Listar categorías |
+| GET    | `/categorias/{categoria_id}` | Obtener una categoría **con sus artículos anidados** (404 si no existe) |
+| PUT    | `/categorias/{categoria_id}` | Actualizar una categoría (404 / 409) |
+| DELETE | `/categorias/{categoria_id}` | Eliminar una categoría (409 si todavía tiene artículos) |
 
-- **SQLAlchemy en requirements**: `SQLAlchemy==2.0.36` en `requirements.txt`.
-- **`database.py`**: define `engine` (SQLite, `check_same_thread=False`), `SessionLocal`
-  (sessionmaker) y `get_db()` como dependencia inyectable con `Depends()`.
-- **Modelo**: `Articulo` en `src/models/articulo.py`, mapeado a la tabla `articulos`
-  (`id`, `nombre`, `precio`, `categoria`).
-- **CRUD real**: los 5 path operations en `routers/articulos.py` ya no usan una lista en
-  memoria — cada uno abre una `Session` vía `Depends(get_db)` y hace `db.add()`,
-  `db.query()`, `db.get()`, `db.commit()`, `db.delete()`, según corresponda.
-- **Schemas Pydantic**: `ArticuloResponse` usa `model_config = ConfigDict(from_attributes=True)`
-  para poder construirse directamente desde un objeto SQLAlchemy.
-- **Errores 404**: se levantan con `HTTPException` cuando el `articulo_id` no existe en la DB.
+### Artículos (`/articulos`)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | `/articulos/` | Crear un artículo (404 si la `categoria_id` no existe) |
+| GET    | `/articulos/` | Listar artículos (filtros: `categoria` por nombre, `limite`) |
+| GET    | `/articulos/{articulo_id}` | Obtener un artículo **con su categoría anidada** (404 si no existe) |
+| PUT    | `/articulos/{articulo_id}` | Actualizar un artículo (404 si no existe el artículo o la categoría) |
+| DELETE | `/articulos/{articulo_id}` | Eliminar un artículo (404 si no existe) |
+
+### Ejemplo de uso
+
+```bash
+# 1) Crear una categoría
+curl -X POST http://127.0.0.1:8000/categorias/ \
+  -H "Content-Type: application/json" \
+  -d '{"nombre": "Periféricos", "descripcion": "Teclados y mouses"}'
+
+# 2) Crear un artículo que apunta a esa categoría (FK)
+curl -X POST http://127.0.0.1:8000/articulos/ \
+  -H "Content-Type: application/json" \
+  -d '{"nombre": "Teclado mecánico", "precio": 15999.99, "categoria_id": 1}'
+```
+
+Respuesta de `GET /articulos/1` (categoría **anidada**):
+
+```json
+{
+  "id": 1,
+  "nombre": "Teclado mecánico",
+  "precio": 15999.99,
+  "categoria_id": 1,
+  "categoria": { "id": 1, "nombre": "Periféricos", "descripcion": "Teclados y mouses" }
+}
+```
+
+Respuesta de `GET /categorias/1` (artículos **anidados**):
+
+```json
+{
+  "id": 1,
+  "nombre": "Periféricos",
+  "descripcion": "Teclados y mouses",
+  "articulos": [
+    { "id": 1, "nombre": "Teclado mecánico", "precio": 15999.99, "categoria_id": 1 }
+  ]
+}
+```
+
+## Notas sobre el cumplimiento de la consigna (TP5)
+
+- **Solo SQLModel**: `requirements.txt` ya no lista SQLAlchemy y el código de `src/` no lo importa;
+  se usan `SQLModel`, `Field`, `Relationship`, `Session`, `create_engine` y `select` de `sqlmodel`.
+  (SQLAlchemy sigue instalado como dependencia interna de SQLModel/Alembic, y los archivos
+  de migración que genera Alembic usan `import sqlalchemy as sa` por diseño de la herramienta.)
+- **Alembic**: configurado en `migrations/env.py` con `SQLModel.metadata` como `target_metadata`
+  y `render_as_batch=True` (necesario para modificar tablas en SQLite). Incluye la migración inicial
+  `migracion_inicial_categorias_y_articulos`, con `upgrade()` y `downgrade()`.
+- **Modelos y Foreign Key**: `Categoria` y `Articulo`. `Articulo.categoria_id` es una FK a `categorias.id`
+  y ambos modelos se vinculan con `Relationship` (`back_populates`).
+  Como SQLite no hace cumplir las FK por defecto, la API valida que la categoría exista antes de
+  guardar (404) y no deja borrar categorías con artículos (409).
+- **Schemas anidados** (`src/schemas/anidados.py`): `ArticuloConCategoria` (tiene un campo
+  `categoria: CategoriaResponse`) y `CategoriaConArticulos` (tiene `articulos: list[ArticuloResumen]`).
+- **Separación tabla / schema**: los modelos con `table=True` son las tablas; los schemas
+  son clases `SQLModel` sin `table=True`, por lo que se validan como Pydantic pero no crean tablas.
