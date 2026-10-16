@@ -38,6 +38,8 @@ proyecto_fastapi/
 
 ## Instalación
 
+> **Requisito:** Python 3.11 o superior.
+
 1. Crear y activar un entorno virtual:
 
 ```bash
